@@ -6,13 +6,15 @@
          '[boot.util :refer :all])
 
 (declare sift-with-meta-tests
-         sift-include-tests)
+         sift-include-tests
+         sift-add-meta-tests)
 
 (deftask integration-tests
   []
   ;; Each test task should reset the fileset itself and leave
   ;; a clean env for the next. How? Now they are executed one at the time.
-  (comp (sift-with-meta-tests)
+  (comp (sift-add-meta-tests)
+        #_(sift-with-meta-tests)
         #_(sift-include-tests)
         ;; "Other test tasks here
         ))
@@ -71,3 +73,28 @@
   #_(comp (sift :add-jar {'org.clojure/tools.reader #".*"}) ;; populate
           (sift :include #{#".clj$" #".MD$"} :invert true)
           (include-invert-tests)))
+
+(deftask add-meta-tests []
+  (with-pre-wrap fileset
+    (let [tmpfiles (output-files fileset)
+          tmpfiles-with-meta (filter :boot-test-tag tmpfiles)]
+      (is (empty? (not-by-re [#".clj$"] tmpfiles-with-meta)) "non .clj files should not have :boot-test-tag metadata")
+      (is (seq (by-re [#".clj$"] tmpfiles-with-meta)) "only .clj files should have :boot-test-tag metadata"))
+    fileset))
+
+(deftask add-meta-invert-tests []
+  (with-pre-wrap fileset
+    (let [tmpfiles (output-files fileset)
+          tmpfiles-with-meta (filter :boot-test-tag tmpfiles)]
+      (is (empty? (by-re [#".clj$"] tmpfiles-with-meta)) ".clj files should not have :boot-test-tag metadata")
+      (is (seq (not-by-re [#".clj$"] tmpfiles-with-meta)) "only non .clj files should have :boot-test-tag metadata"))
+    fileset))
+
+(deftask sift-add-meta-tests []
+  (comp (sift :add-jar {'org.clojure/tools.reader #".*"}) ;; populate
+        (sift :add-meta {#".clj$" :boot-test-tag})
+        (add-meta-tests))
+  ;; how to reset the fileset?
+  #_(comp (sift :add-jar {'org.clojure/tools.reader #".*"}) ;; populate
+          (sift :add-meta {#".clj$" :boot-test-tag} :invert true)
+          (add-meta-invert-tests)))
