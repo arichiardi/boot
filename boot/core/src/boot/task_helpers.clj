@@ -56,15 +56,16 @@
 
 (defn- sift-match
   [invert? regexes]
-  (->> (map #(partial re-find %) regexes)
-       (apply some-fn)
-       (comp (if invert? not identity))))
+  (let [pick-fn (if-not invert? some some) ]
+    (fn [path tmpfile]
+      ((if-not invert? identity not)
+       (some #(re-find % path) regexes)))))
 
 (defn- sift-meta
   [invert? kws]
-  (->> (map #(fn [x] (contains? (meta x) %)) kws)
-       (apply some-fn)
-       (comp (if invert? not identity))))
+  (fn [path tmpfile]
+    (some (comp (if-not invert? identity not)
+                (partial contains? kws)) (keys tmpfile))))
 
 (defn- sift-mv
   [rolekey invert? optargs]
@@ -85,10 +86,11 @@
            (reduce #(tmpd/add %1 dir %2 nil) fileset)))))
 
 (defn- sift-filter
+  "Similar to filter, where match? is a predicate with signature [path tmpfile]."
   [match?]
-  (let [reducer (fn [xs k v] (if-not (match? k) xs (assoc xs k v)))]
+  (let [reducer (fn [xs k v] (if-not (match? k v) xs (assoc xs k v)))]
     (fn [fileset] (->> (partial reduce-kv reducer {})
-                       (update-in fileset [:tree])))))
+                      (update-in fileset [:tree])))))
 
 (defn- jar-path
   [sym]
